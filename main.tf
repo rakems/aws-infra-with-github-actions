@@ -1,5 +1,5 @@
-resource "aws_iam_role" "ec2_role" {
-  name = "ec2_role"
+resource "aws_iam_role" "ec2_role_test" {
+  name = "ec2_role_test"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
@@ -35,14 +35,14 @@ resource "aws_iam_policy" "ec2_policy" {
 }
 
 resource "aws_iam_role_policy_attachment" "ec2_attach" {
-  role       = aws_iam_role.ec2_role.name
+  role       = aws_iam_role.ec2_role_test.name
   policy_arn = aws_iam_policy.ec2_policy.arn
 }
 
 resource "aws_instance" "example" {
   ami                  = "ami-0c55b159cbfafe1f0"
   instance_type        = "t2.micro"
-  iam_instance_profile = aws_iam_role.ec2_role.name
+  iam_instance_profile = aws_iam_role.ec2_role_test.name
 
   tags = {
     Name = "example-instance"
