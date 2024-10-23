@@ -1,0 +1,17 @@
+# Ignore Terraform's workspace-specific files
+.terraform/
+.terraform.lock.hcl
+
+# Ignore Terraform state files
+terraform.tfstate
+terraform.tfstate.backup
+
+# Ignore any Terraform plan files (if created)
+*.tfplan
+
+# Optionally, ignore any local environment variable files
+*.tfvars
+
+# Ignore any local IDE/editor settings if applicable
+.idea/
+.vscode/
