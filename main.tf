@@ -40,7 +40,7 @@ resource "aws_iam_role_policy_attachment" "ec2_attach" {
 }
 
 resource "aws_instance" "example" {
-  ami                  = "ami-0c55b159cbfafe1f0"
+  ami                  = "ami-0acc77abdfc7ed5a6"
   instance_type        = "t2.micro"
   iam_instance_profile = aws_iam_role.ec2_role_test.name
 
