@@ -39,9 +39,23 @@ resource "aws_iam_role_policy_attachment" "ec2_attach" {
   policy_arn = aws_iam_policy.ec2_policy_test.arn
 }
 
+data "aws-vpc" "my_vpc" {
+  cidr_block = "10.0.0.0/16"
+  tags = {
+    Name = "my_vpc"
+  }
+}
+
+data "aws_subnet_ids" "my_subnet" {
+  vpc_id            = aws_vpc.my_vpc.id
+  cidr_block        = "10.0.1.0/24"
+  availability_zone = "us-east-1a"
+}
+
 resource "aws_instance" "example" {
   ami                  = "ami-06b21ccaeff8cd686"
   instance_type        = "t2.micro"
+  subnet_id            = aws_subnet.my_subnet.id
   iam_instance_profile = aws_iam_role.ec2_role_test.name
 
   tags = {
