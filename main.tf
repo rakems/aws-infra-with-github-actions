@@ -151,7 +151,16 @@ resource "aws_instance" "sample_ec2" {
   tags = {
     Name = "sample_ec2-instance"
   }
+  # User data script to install CloudWatch agent
+  user_data = <<-EOF
+              #!/bin/bash
+              yum update -y
+              yum install -y amazon-cloudwatch-agent
+              /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-config-wizard
+              systemctl start amazon-cloudwatch-agent
+              EOF
 }
+
 #Role for firehose
 resource "aws_iam_role" "firehose_role" {
   name = "firehose_dellivery_role"
@@ -219,4 +228,37 @@ resource "aws_kinesis_firehose_delivery_stream" "firehose" {
 # craete s3 bucket
 resource "aws_s3_bucket" "firehose-backup-example-bucket" {
   bucket = "firehose-backup-example-bucket"
+}
+
+# Create CloudWatch Log Group
+resource "aws_cloudwatch_log_group" "example_log_group" {
+  name = "example_log_group"
+}
+
+# Create IAM role for CloudWatch Agent
+resource "aws_iam_role" "cloudwatch_agent_role" {
+  name = "cloudwatch_agent_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Action = "sts:AssumeRole",
+      Effect = "Allow",
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+    }]
+  })
+}
+
+# Attach policy to CloudWatch Agent role
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent_policy" {
+  role       = aws_iam_role.cloudwatch_agent_role.name
+  policy_arn = aws_iam_policy.firehose_policy.arn
+}
+
+# Create an IAM Instance Profile for CloudWatch Agent
+resource "aws_iam_instance_profile" "cloudwatch_agent_profile" {
+  name = "cloudwatch_agent_profile"
+  role = aws_iam_role.cloudwatch_agent_role.name
 }
