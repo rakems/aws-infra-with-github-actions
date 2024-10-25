@@ -1,5 +1,3 @@
-# IAM Role and Policy
-
 resource "aws_iam_role" "ec2_role_test" {
   name = "ec2_role_test"
 
@@ -53,6 +51,8 @@ resource "aws_iam_policy" "ec2_policy_test" {
     ]
   })
 }
+
+
 
 resource "aws_iam_role_policy_attachment" "ec2_attach" {
   role       = aws_iam_role.ec2_role_test.name
@@ -151,4 +151,72 @@ resource "aws_instance" "sample_ec2" {
   tags = {
     Name = "sample_ec2-instance"
   }
+}
+#Role for firehose
+resource "aws_iam_role" "firehose_role" {
+  name = "firehose_dellivery_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Action = "sts:AssumeRole",
+      Effect = "Allow",
+      Principal = {
+        Service = "firehose.amazonaws.com"
+      }
+    }]
+  })
+}
+
+#policy for firehose
+resource "aws_iam_policy" "firehose_policy" {
+  name = "firehose_policy"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action = [
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:ListBucket"
+        ],
+        Effect   = "Allow",
+        Resource = "*"
+      },
+      {
+        Action = [
+          "logs:PutLogEvents",
+          "logs:CreateLogStream"
+        ],
+        Effect   = "Allow",
+        Resource = "*"
+      }
+    ]
+  })
+
+}
+
+#Attach policy to role
+resource "aws_iam_role_policy_attachment" "firehose_role_policy_attachment" {
+  role       = aws_iam_role.firehose_role.name
+  policy_arn = aws_iam_policy.firehose_policy.arn
+}
+
+# Create Firehose Delivery Stream with S3 destination
+resource "aws_kinesis_firehose_delivery_stream" "firehose" {
+  name        = "example-firehose"
+  destination = "extended_s3"
+
+  # S3 Configuration
+  extended_s3_configuration {
+    role_arn           = aws_iam_role.firehose_role.arn                   # Firehose role ARN
+    bucket_arn         = aws_s3_bucket.firehose-backup-example-bucket.arn # S3 bucket ARN
+    compression_format = "GZIP"                                           # Compression format
+
+  }
+}
+
+# craete s3 bucket
+resource "aws_s3_bucket" "firehose-backup-example-bucket" {
+  bucket = "firehose-backup-example-bucket"
 }
