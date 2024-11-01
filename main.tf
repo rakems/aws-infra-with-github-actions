@@ -1,3 +1,26 @@
+#1. create IAM role
+# ec2_role_test
+# firehose_role
+# cloudwatch_agent_role
+#2. create IAM policy
+# ec2_policy_test
+# firehose_policy
+#3. Attach IAM policy to IAM role
+# ec2_attach
+# firehose_role_policy_attachment
+# cloudwatch_agent_policy
+# firehose_lambda_policy
+# firehose_lambda_access
+# 4. create profile
+# ec2_instance_profile
+# cloudwatch_agent_profile
+# 5. create resource
+
+
+
+
+
+
 resource "aws_iam_role" "ec2_role_test" {
   name = "ec2_role_test"
 
@@ -161,9 +184,35 @@ resource "aws_instance" "sample_ec2" {
               EOF
 }
 
-#Role for firehose
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Role for Firehose
 resource "aws_iam_role" "firehose_role" {
-  name = "firehose_dellivery_role"
+  name = var.firehose_role_name
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
@@ -177,63 +226,114 @@ resource "aws_iam_role" "firehose_role" {
   })
 }
 
-#policy for firehose
-resource "aws_iam_policy" "firehose_policy" {
-  name = "firehose_policy"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Action = [
-          "s3:PutObject",
-          "s3:GetObject",
-          "s3:ListBucket"
-        ],
-        Effect   = "Allow",
-        Resource = "*"
-      },
-      {
-        Action = [
-          "logs:PutLogEvents",
-          "logs:CreateLogStream"
-        ],
-        Effect   = "Allow",
-        Resource = "*"
-      }
-    ]
-  })
+# Create Firehose Delivery Stream for EC2 Infrastructure Logs
+resource "aws_kinesis_firehose_delivery_stream" "infra_firehose" {
+  name        = "infra-firehose"
+  destination = "http_endpoint"
 
-}
+  http_endpoint_configuration {
+    name       = "splunk-endpoint-infra"
+    role_arn   = aws_iam_role.firehose_role.arn
+    url        = var.splunk_hec_url
+    access_key = var.splunk_hec_access_key
 
-#Attach policy to role
-resource "aws_iam_role_policy_attachment" "firehose_role_policy_attachment" {
-  role       = aws_iam_role.firehose_role.name
-  policy_arn = aws_iam_policy.firehose_policy.arn
-}
+    # Configure buffering options
+    buffering_size     = var.buffering_size
+    buffering_interval = var.buffering_interval
 
-# Create Firehose Delivery Stream with S3 destination
-resource "aws_kinesis_firehose_delivery_stream" "firehose" {
-  name        = "example-firehose"
-  destination = "extended_s3"
-
-  # S3 Configuration
-  extended_s3_configuration {
-    role_arn           = aws_iam_role.firehose_role.arn                   # Firehose role ARN
-    bucket_arn         = aws_s3_bucket.firehose-backup-example-bucket.arn # S3 bucket ARN
-    compression_format = "GZIP"                                           # Compression format
-
+    # Enable CloudWatch logging
+    cloudwatch_logging_options {
+      enabled         = true
+      log_group_name  = "/aws/kinesisfirehose/infra-firehose"
+      log_stream_name = "splunk-delivery-stream-infra"
+    }
+    s3_configuration {
+      role_arn           = aws_iam_role.firehose_role.arn                   # Firehose role ARN
+      bucket_arn         = aws_s3_bucket.firehose-backup-example-bucket.arn # S3 bucket ARN
+      compression_format = "GZIP"                                           # Compression format
+    }
   }
 }
 
-# craete s3 bucket
-resource "aws_s3_bucket" "firehose-backup-example-bucket" {
-  bucket = "firehose-backup-example-bucket"
+# Create Firehose Delivery Stream for EC2 Application Logs
+resource "aws_kinesis_firehose_delivery_stream" "app_firehose" {
+  name        = "app-firehose"
+  destination = "http_endpoint"
+
+  http_endpoint_configuration {
+    name       = "splunk-endpoint-app"
+    role_arn   = aws_iam_role.firehose_role.arn
+    url        = var.splunk_hec_url
+    access_key = var.splunk_hec_access_key
+
+    # Configure buffering options
+    buffering_size     = var.buffering_size
+    buffering_interval = var.buffering_interval
+
+    # Enable CloudWatch logging
+    cloudwatch_logging_options {
+      enabled         = true
+      log_group_name  = "/aws/kinesisfirehose/app-firehose"
+      log_stream_name = "splunk-delivery-stream-app"
+    }
+    s3_configuration {
+      role_arn           = aws_iam_role.firehose_role.arn                   # Firehose role ARN
+      bucket_arn         = aws_s3_bucket.firehose-backup-example-bucket.arn # S3 bucket ARN
+      compression_format = "GZIP"                                           # Compression format
+    }
+  }
 }
 
-# Create CloudWatch Log Group
-resource "aws_cloudwatch_log_group" "example_log_group" {
-  name = "example_log_group"
+# CloudWatch Logs Subscription Filter for EC2 Infrastructure Logs
+resource "aws_cloudwatch_log_subscription_filter" "infralogs_to_firehose" {
+  name            = "infralogs-to-firehose"
+  log_group_name  = var.cloudwatch_log_group_infra
+  filter_pattern  = "" # Filter pattern to capture infra logs
+  destination_arn = aws_kinesis_firehose_delivery_stream.infra_firehose.arn
+  role_arn        = aws_iam_role.firehose_role.arn
 }
+
+# CloudWatch Logs Subscription Filter for EC2 Application Logs
+resource "aws_cloudwatch_log_subscription_filter" "applogs_to_firehose" {
+  name            = "applogs-to-firehose"
+  log_group_name  = var.cloudwatch_log_group_app
+  filter_pattern  = "" # Filter pattern to capture app logs
+  destination_arn = aws_kinesis_firehose_delivery_stream.app_firehose.arn
+  role_arn        = aws_iam_role.firehose_role.arn
+}
+
+# Create S3 bucket for backup (optional)
+resource "aws_s3_bucket" "firehose_backup_example_bucket" {
+  bucket = var.firehose_bucket_name
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Create CloudWatch Log Group
+/* resource "aws_cloudwatch_log_group" "example_log_group" {
+  name = "example_log_group"
+} */
 
 # Create IAM role for CloudWatch Agent
 resource "aws_iam_role" "cloudwatch_agent_role" {

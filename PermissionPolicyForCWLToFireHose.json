@@ -1,0 +1,14 @@
+{
+    "Statement":[
+      {
+        "Effect":"Allow",
+        "Action":["firehose:*"],
+        "Resource":["arn:aws:firehose:eu-north-1:747565123955:deliverystream/FirehoseSplunkDeliveryStream"]
+      },
+      {
+        "Effect":"Allow",
+        "Action":["iam:PassRole"],
+        "Resource":["arn:aws:iam::747565123955:role/CWLtoKinesisFirehoseRole"]
+      }
+    ]
+}
